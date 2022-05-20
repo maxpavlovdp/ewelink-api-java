@@ -49,23 +49,23 @@ public class EweLink {
     private static Thread webSocketMonitorThread = null;
     Gson gson = new Gson();
 
-    public EweLink(String region,String email, String password, int activityTimer) {
-      this.region = region;
-      this.email = email;
-      this.password = password;
-      if (region!= null) {
-          baseUrl = "https://" + region + "-api.coolkit.cc:8080/api/";
-      }
-      if (activityTimer < 30) {
-          activityTimer = 30;
-      }
-      this.activityTimer = activityTimer;
+    public EweLink(String region, String email, String password, int activityTimer) {
+        this.region = region;
+        this.email = email;
+        this.password = password;
+        if (region != null) {
+            baseUrl = "https://" + region + "-api.coolkit.cc:8080/api/";
+        }
+        if (activityTimer < 30) {
+            activityTimer = 30;
+        }
+        this.activityTimer = activityTimer;
 
-      logger.info("EweLinkApi startup params : {} {}", region,email);
+        logger.info("EweLinkApi startup params : {} {}", region, email);
 
     }
 
-    public void login() throws Exception{
+    public void login() throws Exception {
 
 
         URL url = new URL(baseUrl + "user/login");
@@ -87,9 +87,9 @@ public class EweLink {
         loginRequest.setVersion("8");
         loginRequest.setNonce(Util.getNonce());
 
-        conn.setRequestProperty("Authorization","Sign " +getAuthMac(gson.toJson(loginRequest)));
+        conn.setRequestProperty("Authorization", "Sign " + getAuthMac(gson.toJson(loginRequest)));
 
-        logger.debug("Login Request:{}",loginRequest.toString());
+        logger.debug("Login Request:{}", loginRequest.toString());
 
 
         DataOutputStream wr = new DataOutputStream(conn.getOutputStream());
@@ -101,33 +101,33 @@ public class EweLink {
         int responseCode = conn.getResponseCode();
         InputStream is;
 
-        logger.debug("Login Response Code :{}",responseCode);
+        logger.debug("Login Response Code :{}", responseCode);
 
         if (responseCode >= 400) is = conn.getErrorStream();
         else is = conn.getInputStream();
 
-        try(BufferedReader br = new BufferedReader(
+        try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(conn.getInputStream(), "utf-8"))) {
             StringBuilder response = new StringBuilder();
             String responseLine = null;
             while ((responseLine = br.readLine()) != null) {
                 response.append(responseLine.trim());
             }
-            logger.debug("Login Response Raw:{}",response.toString());
+            logger.debug("Login Response Raw:{}", response.toString());
 
-            LoginResponse loginResponse = gson.fromJson(response.toString(),LoginResponse.class);
+            LoginResponse loginResponse = gson.fromJson(response.toString(), LoginResponse.class);
 
-            logger.debug("Login Response:{}",loginResponse.toString());
+            logger.debug("Login Response:{}", loginResponse.toString());
 
-            if (loginResponse.getError() > 0){
+            if (loginResponse.getError() > 0) {
                 //something wrong with login, throw exception back up with msg
                 throw new Exception(loginResponse.getMsg());
 
-            }else {
+            } else {
                 accessToken = loginResponse.getAt();
                 apiKey = loginResponse.getUser().getApikey();
-                logger.info("accessToken:{}",accessToken);
-                logger.info("apiKey:{}",apiKey);
+                logger.info("accessToken:{}", accessToken);
+                logger.info("apiKey:{}", apiKey);
 
                 isLoggedIn = true;
                 lastActivity = new Date().getTime();
@@ -140,17 +140,17 @@ public class EweLink {
     }
 
     public void getWebSocket(WssResponse wssResponse) throws Exception {
-        if (!isLoggedIn){
+        if (!isLoggedIn) {
             throw new Exception("Not Logged In, please call login Method");
         }
 
-        eweLinkWebSocketClient = new EweLinkWebSocketClient(new URI("wss://"+ region+"-pconnect3.coolkit.cc:8080/api/ws"));
+        eweLinkWebSocketClient = new EweLinkWebSocketClient(new URI("wss://" + region + "-pconnect3.coolkit.cc:8080/api/ws"));
         clientWssResponse = wssResponse;
         eweLinkWebSocketClient.setWssResponse(clientWssResponse);
-        eweLinkWebSocketClient.setWssLogin(gson.toJson(new WssLogin(accessToken,apiKey,APP_ID,Util.getNonce())));
+        eweLinkWebSocketClient.setWssLogin(gson.toJson(new WssLogin(accessToken, apiKey, APP_ID, Util.getNonce())));
         eweLinkWebSocketClient.connect();
 
-        if(webSocketMonitorThread == null) {
+        if (webSocketMonitorThread == null) {
             webSocketMonitorThread = new Thread(new WebSocketMonitor());
             webSocketMonitorThread.start();
         }
@@ -158,18 +158,18 @@ public class EweLink {
 
     }
 
-    public Devices getDevices() throws Exception {
+    public String getDevices() throws Exception {
 
-        if (!isLoggedIn){
+        if (!isLoggedIn) {
             throw new Exception("Not Logged In, please call login Method");
         }
-        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()){
+        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()) {
             logger.info("Longer than last Activity, perform login Again");
             login();
         }
 
 
-        URL url = new URL(baseUrl + "/user/device?lang=en&appid="+APP_ID+"&ts="+new Date().getTime()+"&version=8&getTags=1");
+        URL url = new URL(baseUrl + "/user/device?lang=en&appid=" + APP_ID + "&ts=" + new Date().getTime() + "&version=8&getTags=1");
 
         HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
@@ -177,7 +177,7 @@ public class EweLink {
         conn.setDoOutput(true);
         conn.setRequestProperty("Content-Type", "application/json; utf-8");
         conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Authorization","Bearer " +accessToken);
+        conn.setRequestProperty("Authorization", "Bearer " + accessToken);
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(TIMEOUT);
 
@@ -188,48 +188,36 @@ public class EweLink {
         if (responseCode >= 400) is = conn.getErrorStream();
         else is = conn.getInputStream();
 
-        try(BufferedReader br = new BufferedReader(
+        try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(conn.getInputStream(), "utf-8"))) {
             StringBuilder response = new StringBuilder();
             String responseLine = null;
             while ((responseLine = br.readLine()) != null) {
                 response.append(responseLine.trim());
             }
-            logger.debug("GetDevices Response Raw:{}",response.toString());
+            String rawOutput = response.toString();
+            logger.debug("GetDevices Response Raw:{}", rawOutput);
 
-            Devices getDevices = gson.fromJson(response.toString(), Devices.class);
-
-            logger.debug("GetDevices Response:{}",getDevices.toString());
-
-            if (getDevices.getError() > 0){
-                //something wrong with login, throw exception back up with msg
-                throw new Exception("Get Devices Error:" + getDevices.toString());
-
-            }else {
-                logger.info("getDevices:{}",getDevices.toString());
-                lastActivity = new Date().getTime();
-                return getDevices;
-            }
-
+            return rawOutput;
         }
 
     }
 
     public DeviceItem getDevice(String deviceId) throws Exception {
 
-        if (!isLoggedIn){
+        if (!isLoggedIn) {
             throw new Exception("Not Logged In, please call login Method");
         }
-        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()){
+        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()) {
             logger.info("Longer than last Activity, perform login Again");
             login();
         }
 
 
-        URL url = new URL(baseUrl + "/user/device/"+deviceId+"?deviceid="+deviceId+"" +
+        URL url = new URL(baseUrl + "/user/device/" + deviceId + "?deviceid=" + deviceId + "" +
                 "&lang=en" +
-                "&appid="+APP_ID+"" +
-                "&ts="+new Date().getTime()+"&version=8");
+                "&appid=" + APP_ID + "" +
+                "&ts=" + new Date().getTime() + "&version=8");
 
         HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
@@ -237,7 +225,7 @@ public class EweLink {
         conn.setDoOutput(true);
         conn.setRequestProperty("Content-Type", "application/json; utf-8");
         conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Authorization","Bearer " +accessToken);
+        conn.setRequestProperty("Authorization", "Bearer " + accessToken);
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(TIMEOUT);
 
@@ -248,25 +236,25 @@ public class EweLink {
         if (responseCode >= 400) is = conn.getErrorStream();
         else is = conn.getInputStream();
 
-        try(BufferedReader br = new BufferedReader(
+        try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(conn.getInputStream(), "utf-8"))) {
             StringBuilder response = new StringBuilder();
             String responseLine = null;
             while ((responseLine = br.readLine()) != null) {
                 response.append(responseLine.trim());
             }
-            logger.debug("GetDevice Response Raw:{}",response.toString());
+            logger.debug("GetDevice Response Raw:{}", response.toString());
 
             DeviceItem device = gson.fromJson(response.toString(), DeviceItem.class);
 
-            logger.debug("GetDevice Response:{}",device.toString());
+            logger.debug("GetDevice Response:{}", device.toString());
 
-            if (device.getError() > 0){
+            if (device.getError() > 0) {
                 //something wrong with login, throw exception back up with msg
                 throw new Exception("Get Device Error:" + device.toString());
 
-            }else {
-                logger.info("getDevice:{}",device.toString());
+            } else {
+                logger.info("getDevice:{}", device.toString());
                 lastActivity = new Date().getTime();
                 return device;
             }
@@ -277,19 +265,19 @@ public class EweLink {
 
     public Status getDeviceStatus(String deviceId) throws Exception {
 
-        if (!isLoggedIn){
+        if (!isLoggedIn) {
             throw new Exception("Not Logged In, please call login Method");
         }
-        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()){
+        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()) {
             logger.info("Longer than last Activity, perform login Again");
             login();
         }
 
 
-        URL url = new URL(baseUrl + "/user/device/status?deviceid="+deviceId+"" +
+        URL url = new URL(baseUrl + "/user/device/status?deviceid=" + deviceId + "" +
                 "&lang=en" +
-                "&appid="+APP_ID+"" +
-                "&ts="+new Date().getTime()+"&version=8&params=switch|switches");
+                "&appid=" + APP_ID + "" +
+                "&ts=" + new Date().getTime() + "&version=8&params=switch|switches");
 
         HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
@@ -297,7 +285,7 @@ public class EweLink {
         conn.setDoOutput(true);
         conn.setRequestProperty("Content-Type", "application/json; utf-8");
         conn.setRequestProperty("Accept", "application/json");
-        conn.setRequestProperty("Authorization","Bearer " +accessToken);
+        conn.setRequestProperty("Authorization", "Bearer " + accessToken);
         conn.setConnectTimeout(TIMEOUT);
         conn.setReadTimeout(TIMEOUT);
 
@@ -308,30 +296,30 @@ public class EweLink {
         if (responseCode >= 400) is = conn.getErrorStream();
         else is = conn.getInputStream();
 
-        try(BufferedReader br = new BufferedReader(
+        try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(conn.getInputStream(), "utf-8"))) {
             StringBuilder response = new StringBuilder();
             String responseLine = null;
             while ((responseLine = br.readLine()) != null) {
                 response.append(responseLine.trim());
             }
-            logger.debug("Status Response Raw:{}",response.toString());
+            logger.debug("Status Response Raw:{}", response.toString());
 
             Status status = gson.fromJson(response.toString(), Status.class);
 
-            logger.debug("Status Response:{}",status.toString());
+            logger.debug("Status Response:{}", status.toString());
 
-            if (status.getError() > 0){
+            if (status.getError() > 0) {
                 //something wrong with login, throw exception back up with msg
 
-                if (status.getError() == 503){
+                if (status.getError() == 503) {
                     throw new DeviceOfflineError("Status Error:" + status.toString());
                 }
 
                 throw new Exception("Status Error:" + status.toString());
 
-            }else {
-                logger.info("Status:{}",status.toString());
+            } else {
+                logger.info("Status:{}", status.toString());
                 lastActivity = new Date().getTime();
                 //this is not returned but to be nice we do
                 status.setDeviceid(deviceId);
@@ -342,48 +330,22 @@ public class EweLink {
 
     }
 
-    public Status setDeviceStatusByName(String name, String status) throws Exception{
+    public Status setDeviceStatus(String deviceId, String status) throws Exception {
 
-        if (!isLoggedIn){
+        if (!isLoggedIn) {
             throw new Exception("Not Logged In, please call login Method");
         }
-        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()){
+        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()) {
             logger.info("Longer than last Activity, perform login Again");
             login();
         }
 
-        Devices devices = getDevices();
-        String selectedDeviceId = null;
-        for (DeviceItem deviceItem : devices.getDevicelist()) {
-            if (deviceItem.getName().equalsIgnoreCase(name)){
-                selectedDeviceId = deviceItem.getDeviceid();
-            }
-        }
-
-        if (selectedDeviceId == null) {
-            throw new Exception("No Device id Found for Device Name:" + name);
-        }
-
-        return setDeviceStatus(selectedDeviceId,status);
-
-    }
-
-    public Status setDeviceStatus(String deviceId, String status) throws Exception{
-
-        if (!isLoggedIn){
-            throw new Exception("Not Logged In, please call login Method");
-        }
-        if (lastActivity + (activityTimer * 60 * 1000) < new Date().getTime()){
-            logger.info("Longer than last Activity, perform login Again");
-            login();
-        }
-
-        if (status.equalsIgnoreCase("on")){
+        if (status.equalsIgnoreCase("on")) {
             status = "on";
-        }else {
+        } else {
             status = "off";
         }
-        logger.info("Setting device {} status to {}",deviceId,status);
+        logger.info("Setting device {} status to {}", deviceId, status);
 
         URL url = new URL(baseUrl + "user/device/status");
 
@@ -402,12 +364,12 @@ public class EweLink {
         statusChange.setDeviceid(deviceId);
         statusChange.setTs(new Date().getTime() + "");
         statusChange.setVersion("8");
-        statusChange.setParams("{\"switch\":\""+status+"\"}");
+        statusChange.setParams("{\"switch\":\"" + status + "\"}");
 
 
-        conn.setRequestProperty("Authorization","Bearer " +accessToken);
+        conn.setRequestProperty("Authorization", "Bearer " + accessToken);
 
-        logger.debug("StatusChange Request:{}",statusChange.toString());
+        logger.debug("StatusChange Request:{}", statusChange.toString());
 
 
         DataOutputStream wr = new DataOutputStream(conn.getOutputStream());
@@ -419,29 +381,29 @@ public class EweLink {
         int responseCode = conn.getResponseCode();
         InputStream is;
 
-        logger.debug("StatusChange Response Code :{}",responseCode);
+        logger.debug("StatusChange Response Code :{}", responseCode);
 
         if (responseCode >= 400) is = conn.getErrorStream();
         else is = conn.getInputStream();
 
-        try(BufferedReader br = new BufferedReader(
+        try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(conn.getInputStream(), "utf-8"))) {
             StringBuilder response = new StringBuilder();
             String responseLine = null;
             while ((responseLine = br.readLine()) != null) {
                 response.append(responseLine.trim());
             }
-            logger.debug("StatusChange Response Raw:{}",response.toString());
+            logger.debug("StatusChange Response Raw:{}", response.toString());
 
-            Status statusRsp = gson.fromJson(response.toString(),Status.class);
+            Status statusRsp = gson.fromJson(response.toString(), Status.class);
 
-            logger.debug("StatusChange Response:{}",statusRsp.toString());
+            logger.debug("StatusChange Response:{}", statusRsp.toString());
 
-            if (statusRsp.getError() > 0){
+            if (statusRsp.getError() > 0) {
                 //something wrong with login, throw exception back up with msg
                 throw new Exception(statusRsp.getErrmsg());
 
-            }else {
+            } else {
 
 
                 isLoggedIn = true;
@@ -454,7 +416,7 @@ public class EweLink {
 
     }
 
-    private static String getAuthMac (String data) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
+    private static String getAuthMac(String data) throws UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeyException {
 
         Mac sha256_HMAC = null;
 
@@ -472,8 +434,7 @@ public class EweLink {
     }
 
 
-    public class WebSocketMonitor implements  Runnable
-    {
+    public class WebSocketMonitor implements Runnable {
 
         Logger logger = LoggerFactory.getLogger(WebSocketMonitor.class);
         Gson gson = new Gson();
@@ -491,16 +452,16 @@ public class EweLink {
                     eweLinkWebSocketClient.send("ping");
 
                 } catch (Exception e) {
-                    logger.error("Error in sening websocket ping:",e);
+                    logger.error("Error in sening websocket ping:", e);
                     logger.info("Try reconnect to websocket");
                     try {
-                        eweLinkWebSocketClient = new EweLinkWebSocketClient(new URI("wss://"+ region+"-pconnect3.coolkit.cc:8080/api/ws"));
+                        eweLinkWebSocketClient = new EweLinkWebSocketClient(new URI("wss://" + region + "-pconnect3.coolkit.cc:8080/api/ws"));
                         eweLinkWebSocketClient.setWssResponse(clientWssResponse);
-                        eweLinkWebSocketClient.setWssLogin(gson.toJson(new WssLogin(accessToken,apiKey,APP_ID,Util.getNonce())));
+                        eweLinkWebSocketClient.setWssLogin(gson.toJson(new WssLogin(accessToken, apiKey, APP_ID, Util.getNonce())));
                         eweLinkWebSocketClient.connect();
 
-                    }catch (Exception c) {
-                        logger.error("Error trying to reconnect:",c);
+                    } catch (Exception c) {
+                        logger.error("Error trying to reconnect:", c);
                     }
                 }
             }
